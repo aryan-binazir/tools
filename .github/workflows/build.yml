@@ -1,0 +1,61 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Run tests
+      run: go test -v ./...
+    
+    - name: Create bin directory
+      run: mkdir -p bin
+    
+    - name: Build filter tool
+      run: |
+        go build -v -o bin/filter ./cmd/filter
+    
+    - name: Test filter tool - help
+      run: |
+        ./bin/filter --help
+    
+    - name: Test filter tool - stdin
+      run: |
+        echo -e "line1\nerror here\nline3" | ./bin/filter --pattern "error"
+    
+    - name: Test filter tool - verbose
+      run: |
+        echo -e "info: starting\nerror: failed\ninfo: done" | ./bin/filter --pattern "error" --verbose
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: filter-binary
+        path: bin/filter
